@@ -1,0 +1,272 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                    Int      @id @default(autoincrement())
+  email                 String   @unique @db.VarChar(255)
+  username              String?  @unique @db.VarChar(100)
+  passwordHash          String   @db.VarChar(255)
+  salt                  String   @db.VarChar(255)
+  firstName             String?  @db.VarChar(100)
+  lastName              String?  @db.VarChar(100)
+  phone                 String?  @db.VarChar(20)
+
+  // Account status
+  isActive              Boolean  @default(true)
+  isVerified            Boolean  @default(false)
+  isLocked              Boolean  @default(false)
+  lockedUntil           DateTime?
+
+  // Security settings
+  twoFactorEnabled      Boolean  @default(false)
+  twoFactorSecret       String?  @db.VarChar(255)
+  twoFactorBackupCodes  Json?
+
+  // Password policy
+  passwordChangedAt     DateTime @default(now())
+  passwordExpiresAt     DateTime?
+  failedLoginAttempts   Int      @default(0)
+  lastFailedLogin       DateTime?
+
+  // Timestamps
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  lastLoginAt           DateTime?
+
+  // Relations
+  sessions              UserSession[]
+  loginAttempts         LoginAttempt[]
+  securityEvents        SecurityEvent[]
+  otpCodes              OtpCode[]
+  trustedDevices        TrustedDevice[]
+  passwordHistory       PasswordHistory[]
+
+  @@map("users")
+}
+
+model UserSession {
+  id                    String   @id @db.VarChar(128)
+  userId                Int
+  accessTokenHash       String?  @db.VarChar(255)
+  refreshTokenHash      String?  @db.VarChar(255)
+  expiresAt             DateTime
+  refreshExpiresAt      DateTime?
+  deviceFingerprint     String?  @db.VarChar(255)
+  ipAddress             String?  @db.VarChar(45)
+  userAgent             String?  @db.Text
+  countryCode           String?  @db.VarChar(2)
+  city                  String?  @db.VarChar(100)
+  isRememberMe          Boolean  @default(false)
+  isSuspicious          Boolean  @default(false)
+  requires2fa           Boolean  @default(false)
+  createdAt             DateTime @default(now())
+  lastActivity          DateTime @default(now())
+
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@index([deviceFingerprint])
+  @@index([ipAddress])
+  @@map("user_sessions")
+}
+
+model LoginAttempt {
+  id                    Int      @id @default(autoincrement())
+  userId                Int?
+  email                 String   @db.VarChar(255)
+  isSuccessful          Boolean
+  failureReason         FailureReason?
+  ipAddress             String   @db.VarChar(45)
+  userAgent             String?  @db.Text
+  deviceFingerprint     String?  @db.VarChar(255)
+  countryCode           String?  @db.VarChar(2)
+  city                  String?  @db.VarChar(100)
+  isSuspicious          Boolean  @default(false)
+  captchaRequired       Boolean  @default(false)
+  captchaSolved         Boolean  @default(false)
+  attemptedAt           DateTime @default(now())
+
+  user                  User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([email])
+  @@index([ipAddress])
+  @@index([attemptedAt])
+  @@index([isSuccessful])
+  @@map("login_attempts")
+}
+
+model OtpCode {
+  id                    Int      @id @default(autoincrement())
+  userId                Int
+  code                  String   @db.VarChar(10)
+  codeHash              String   @db.VarChar(255)
+  type                  OtpType
+  expiresAt             DateTime
+  isUsed                Boolean  @default(false)
+  usedAt                DateTime?
+  attempts              Int      @default(0)
+  maxAttempts           Int      @default(3)
+  ipAddress             String?  @db.VarChar(45)
+  deviceFingerprint     String?  @db.VarChar(255)
+  createdAt             DateTime @default(now())
+
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([codeHash])
+  @@index([expiresAt])
+  @@index([type])
+  @@map("otp_codes")
+}
+
+model TrustedDevice {
+  id                    Int      @id @default(autoincrement())
+  userId                Int
+  deviceFingerprint     String   @db.VarChar(255)
+  deviceName            String?  @db.VarChar(255)
+  deviceType            DeviceType @default(UNKNOWN)
+  isTrusted             Boolean  @default(false)
+  trustExpiresAt        DateTime?
+  userAgent             String?  @db.Text
+  lastIp                String?  @db.VarChar(45)
+  lastCountry           String?  @db.VarChar(2)
+  lastCity              String?  @db.VarChar(100)
+  firstSeenAt           DateTime @default(now())
+  lastSeenAt            DateTime @default(now())
+  trustedAt             DateTime?
+
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, deviceFingerprint])
+  @@index([deviceFingerprint])
+  @@index([isTrusted])
+  @@map("trusted_devices")
+}
+
+model SecurityEvent {
+  id                    Int      @id @default(autoincrement())
+  userId                Int?
+  eventType             EventType
+  severity              Severity @default(LOW)
+  description           String?  @db.Text
+  ipAddress             String?  @db.VarChar(45)
+  userAgent             String?  @db.Text
+  deviceFingerprint     String?  @db.VarChar(255)
+  countryCode           String?  @db.VarChar(2)
+  city                  String?  @db.VarChar(100)
+  metadata              Json?
+  createdAt             DateTime @default(now())
+
+  user                  User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([eventType])
+  @@index([severity])
+  @@index([createdAt])
+  @@map("security_events")
+}
+
+model PasswordHistory {
+  id                    Int      @id @default(autoincrement())
+  userId                Int
+  passwordHash          String   @db.VarChar(255)
+  salt                  String   @db.VarChar(255)
+  createdAt             DateTime @default(now())
+
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdAt])
+  @@map("password_history")
+}
+
+model RateLimit {
+  id                    Int      @id @default(autoincrement())
+  identifier            String   @db.VarChar(255)
+  identifierType        IdentifierType
+  actionType            ActionType
+  attempts              Int      @default(1)
+  maxAttempts           Int
+  windowStart           DateTime @default(now())
+  windowDuration        Int
+  isBlocked             Boolean  @default(false)
+  blockedUntil          DateTime?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@unique([identifier, identifierType, actionType])
+  @@index([identifier])
+  @@index([blockedUntil])
+  @@map("rate_limits")
+}
+
+// Enums
+enum FailureReason {
+  INVALID_CREDENTIALS
+  ACCOUNT_LOCKED
+  ACCOUNT_INACTIVE
+  INVALID_2FA
+  RATE_LIMITED
+  CAPTCHA_FAILED
+  SUSPICIOUS_DEVICE
+}
+
+enum OtpType {
+  EMAIL_VERIFICATION
+  LOGIN_2FA
+  PASSWORD_RESET
+  DEVICE_VERIFICATION
+}
+
+enum DeviceType {
+  DESKTOP
+  MOBILE
+  TABLET
+  UNKNOWN
+}
+
+enum EventType {
+  LOGIN_SUCCESS
+  LOGIN_FAILED
+  PASSWORD_CHANGED
+  ACCOUNT_LOCKED
+  SUSPICIOUS_LOGIN
+  NEW_DEVICE
+  NEW_LOCATION
+  TWO_FA_ENABLED
+  TWO_FA_DISABLED
+  SESSION_EXPIRED
+}
+
+enum Severity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum IdentifierType {
+  IP
+  USER
+  EMAIL
+}
+
+enum ActionType {
+  LOGIN
+  PASSWORD_RESET
+  OTP_REQUEST
+}

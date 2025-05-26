@@ -1,0 +1,20 @@
+# NestJS Backend Dockerfile for Development
+FROM node:23-alpine
+
+WORKDIR /app
+
+# Copy package.json files first for better cache usage
+COPY package*.json ./
+
+# Install dependencies
+RUN npm install
+
+# Copy the rest of the code
+COPY . .
+
+# Expose the API port and Socket.IO port
+EXPOSE 3001
+EXPOSE 5555
+
+# Start the development server
+CMD ["npm", "run", "start:dev"]
