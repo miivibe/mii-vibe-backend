@@ -258,8 +258,8 @@ export class AuthService {
 
   // Private methods
   private async validatePassword(password: string, hash: string, salt: string): Promise<boolean> {
-    const hashedPassword = await bcrypt.hash(password + salt, 12);
-    return hashedPassword === hash;
+    const passwordWithSalt = password + salt;
+    return await bcrypt.compare(passwordWithSalt, hash);
   }
 
   private async checkAccountStatus(user: any): Promise<void> {
