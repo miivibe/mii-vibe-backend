@@ -1,6 +1,8 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
+import { ResponseInterceptor } from './common/interceptors/response.interceptor';
+import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -31,12 +33,18 @@ async function bootstrap() {
     preflightContinue: false,
   });
 
-  // Global validation pipe
+  // Global pipes, filters, interceptors
   app.useGlobalPipes(new ValidationPipe({
     whitelist: true,
-    forbidNonWhitelisted: true,
+    forbidNonWhitelisted: false,
     transform: true,
+    transformOptions: {
+      enableImplicitConversion: true,
+    },
   }));
+
+  app.useGlobalInterceptors(new ResponseInterceptor());
+  app.useGlobalFilters(new HttpExceptionFilter());
 
   // Global prefix
   app.setGlobalPrefix('api');

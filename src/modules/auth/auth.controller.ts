@@ -12,11 +12,13 @@ import {
 import { Request } from 'express';
 import { AuthService, LoginRequest } from './auth.service';
 import { SendOtpDto, LoginDto, VerifyOtpDto } from './dto/auth.dto';
+import { Public } from '../../common/decorators/public.decorator';
 
 @Controller('auth')
 export class AuthController {
   constructor(private authService: AuthService) {}
 
+  @Public()
   @Post('login')
   @HttpCode(HttpStatus.OK)
   async login(@Body() loginData: LoginDto, @Req() req: Request) {
@@ -33,6 +35,7 @@ export class AuthController {
     return this.authService.login(loginRequest, clientInfo);
   }
 
+  @Public()
   @Post('send-otp')
   @HttpCode(HttpStatus.OK)
   async sendOtp(@Body() sendOtpData: SendOtpDto, @Req() req: Request) {
@@ -40,6 +43,7 @@ export class AuthController {
     return this.authService.sendOtpForLogin(sendOtpData.email, clientInfo);
   }
 
+  @Public()
   @Post('verify-otp')
   @HttpCode(HttpStatus.OK)
   async verifyOtp(@Body() verifyOtpData: VerifyOtpDto, @Req() req: Request) {
@@ -55,6 +59,7 @@ export class AuthController {
     return this.authService.login(loginRequest, clientInfo);
   }
 
+  @Public()
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
   async refreshToken(@Body() { refreshToken }: { refreshToken: string }, @Req() req: Request) {
@@ -62,6 +67,7 @@ export class AuthController {
     return this.authService.refreshToken(refreshToken, clientInfo);
   }
 
+  @Public()
   @Post('forgot-password')
   @HttpCode(HttpStatus.OK)
   async forgotPassword(@Body() { email }: { email: string }, @Req() req: Request) {
@@ -69,6 +75,7 @@ export class AuthController {
     return this.authService.forgotPassword(email, clientInfo);
   }
 
+  @Public()
   @Post('reset-password')
   @HttpCode(HttpStatus.OK)
   async resetPassword(

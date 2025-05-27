@@ -1,41 +1,54 @@
-// src/modules/auth/guards/jwt-auth.guard.ts
-import { Injectable, ExecutionContext, UnauthorizedException } from '@nestjs/common';
-import { AuthGuard } from '@nestjs/passport';
+import {
+  Injectable,
+  ExecutionContext,
+  UnauthorizedException,
+} from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../../prisma/prisma.service';
+import { IS_PUBLIC_KEY } from '../../../common/decorators/public.decorator';
 
 @Injectable()
-export class JwtAuthGuard extends AuthGuard('jwt') {
+export class GlobalAuthGuard {
   constructor(
+    private reflector: Reflector,
     private jwtService: JwtService,
     private prisma: PrismaService,
-  ) {
-    super();
-  }
+  ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
+    // Check if route is public
+    const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+
+    if (isPublic) {
+      return true;
+    }
+
     const request = context.switchToHttp().getRequest();
     const token = this.extractTokenFromHeader(request);
 
     if (!token) {
-      throw new UnauthorizedException('Token không tồn tại');
+      throw new UnauthorizedException('Access token is required');
     }
 
     try {
       const payload = this.jwtService.verify(token);
 
-      // Kiểm tra session còn valid không
+      // Verify session
       const session = await this.prisma.userSession.findUnique({
         where: { id: payload.sessionId },
         include: { user: true }
       });
 
       if (!session || session.expiresAt < new Date()) {
-        throw new UnauthorizedException('Session đã hết hạn');
+        throw new UnauthorizedException('Session expired');
       }
 
       if (!session.user.isActive) {
-        throw new UnauthorizedException('Tài khoản đã bị vô hiệu hóa');
+        throw new UnauthorizedException('Account is inactive');
       }
 
       // Update last activity
@@ -44,7 +57,6 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
         data: { lastActivity: new Date() }
       });
 
-      // ✅ Thêm user vào request
       request.user = {
         sub: payload.sub,
         email: payload.email,
@@ -53,7 +65,7 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
 
       return true;
     } catch (error) {
-      throw new UnauthorizedException('Token không hợp lệ');
+      throw new UnauthorizedException('Invalid access token');
     }
   }
 
