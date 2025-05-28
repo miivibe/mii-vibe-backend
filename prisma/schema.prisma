@@ -53,6 +53,12 @@ model User {
   trustedDevices        TrustedDevice[]
   passwordHistory       PasswordHistory[]
 
+  createdSchedules      Schedule[]
+  voteParticipants      VoteParticipant[]
+  minigameParticipants  MinigameParticipant[]
+  eventParticipants     EventParticipant[]
+  musicRequests         MusicRequest[]
+
   @@map("users")
 }
 
@@ -269,4 +275,382 @@ enum ActionType {
   LOGIN
   PASSWORD_RESET
   OTP_REQUEST
+}
+
+// ===== SCHEDULE SYSTEM =====
+model Schedule {
+  id          Int             @id @default(autoincrement())
+  title       String
+  description String?         @db.Text
+  type        ScheduleType
+  status      ScheduleStatus  @default(PENDING)
+
+  startTime   DateTime
+  endTime     DateTime?
+
+  // Polymorphic relationship
+  targetId    Int?
+  targetType  TargetType?
+
+  // Metadata for different schedule types
+  metadata    Json?
+
+  createdById Int
+  createdBy   User @relation(fields: [createdById], references: [id])
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("schedules")
+}
+
+enum ScheduleType {
+  MUSIC_PLAY
+  EVENT_CREATION
+  VOTE_CREATION
+  MINIGAME_CREATION
+  ANNOUNCEMENT
+  REMINDER
+}
+
+enum ScheduleStatus {
+  PENDING
+  ACTIVE
+  COMPLETED
+  CANCELLED
+  PAUSED
+}
+
+enum TargetType {
+  EVENT
+  VOTE
+  MINIGAME
+  MUSIC_PLAYLIST
+}
+
+// ===== EVENT SYSTEM =====
+model Event {
+  id          Int         @id @default(autoincrement())
+  title       String
+  description String?     @db.Text
+  eventType   EventType
+  status      EventStatus @default(UPCOMING)
+
+  startDate   DateTime
+  endDate     DateTime?
+  location    String?
+  maxParticipants Int?
+
+  // Event specific data
+  metadata    Json?
+  imageUrl    String?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  participants EventParticipant[]
+
+  @@map("events")
+}
+
+enum EventType {
+  BIRTHDAY
+  HAPPY_FRIDAY
+  TEAM_BUILDING
+  MEETING
+  WORKSHOP
+  CELEBRATION
+  ANNOUNCEMENT
+}
+
+enum EventStatus {
+  UPCOMING
+  ONGOING
+  COMPLETED
+  CANCELLED
+}
+
+model EventParticipant {
+  id        Int                    @id @default(autoincrement())
+  eventId   Int
+  userId    Int
+  status    ParticipationStatus    @default(REGISTERED)
+
+  registeredAt DateTime @default(now())
+
+  event     Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user      User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, userId])
+  @@map("event_participants")
+}
+
+enum ParticipationStatus {
+  REGISTERED
+  ATTENDED
+  ABSENT
+  CANCELLED
+}
+
+// ===== VOTING SYSTEM =====
+model Vote {
+  id          Int        @id @default(autoincrement())
+  title       String
+  description String?    @db.Text
+  voteType    VoteType
+  status      VoteStatus @default(ACTIVE)
+
+  startDate   DateTime   @default(now())
+  endDate     DateTime
+
+  // Voting rules
+  allowMultiple Boolean  @default(false)
+  isAnonymous   Boolean  @default(false)
+  maxSelections Int      @default(1)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  options      VoteOption[]
+  participants VoteParticipant[]
+
+  @@map("votes")
+}
+
+enum VoteType {
+  MUSIC_FAVORITE
+  FOOD_CHOICE
+  PERSON_FAVORITE
+  EVENT_PREFERENCE
+  GENERAL_POLL
+}
+
+enum VoteStatus {
+  DRAFT
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+model VoteOption {
+  id          Int    @id @default(autoincrement())
+  voteId      Int
+  optionText  String
+  description String?
+  imageUrl    String?
+  order       Int    @default(0)
+
+  createdAt   DateTime @default(now())
+
+  vote        Vote @relation(fields: [voteId], references: [id], onDelete: Cascade)
+  participants VoteParticipant[]
+
+  @@map("vote_options")
+}
+
+model VoteParticipant {
+  id              Int @id @default(autoincrement())
+  voteId          Int
+  userId          Int
+  selectedOptionId Int
+
+  votedAt         DateTime @default(now())
+
+  vote            Vote       @relation(fields: [voteId], references: [id], onDelete: Cascade)
+  user            User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  selectedOption  VoteOption @relation(fields: [selectedOptionId], references: [id], onDelete: Cascade)
+
+  @@unique([voteId, userId, selectedOptionId])
+  @@map("vote_participants")
+}
+
+// ===== MINIGAME SYSTEM =====
+model Minigame {
+  id          Int           @id @default(autoincrement())
+  title       String
+  description String?       @db.Text
+  gameType    MinigameType
+  status      MinigameStatus @default(ACTIVE)
+
+  startDate   DateTime      @default(now())
+  endDate     DateTime?
+
+  // Game settings
+  timeLimit   Int?          // seconds
+  maxAttempts Int?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  questions    MinigameQuestion[]
+  participants MinigameParticipant[]
+
+  @@map("minigames")
+}
+
+enum MinigameType {
+  QUIZ
+  GUESS_PERSON
+  GUESS_IMAGE
+  TRIVIA
+  PUZZLE
+}
+
+enum MinigameStatus {
+  DRAFT
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+model MinigameQuestion {
+  id           Int          @id @default(autoincrement())
+  minigameId   Int
+  questionText String       @db.Text
+  questionType QuestionType
+  imageUrl     String?
+  order        Int          @default(0)
+  points       Int          @default(1)
+
+  createdAt    DateTime @default(now())
+
+  minigame     Minigame @relation(fields: [minigameId], references: [id], onDelete: Cascade)
+  answerOptions MinigameAnswerOption[]
+
+  @@map("minigame_questions")
+}
+
+enum QuestionType {
+  MULTIPLE_CHOICE
+  TRUE_FALSE
+  GUESS_PERSON
+  GUESS_IMAGE
+  TEXT_INPUT
+}
+
+model MinigameAnswerOption {
+  id         Int     @id @default(autoincrement())
+  questionId Int
+  optionText String
+  isCorrect  Boolean @default(false)
+  order      Int     @default(0)
+
+  createdAt  DateTime @default(now())
+
+  question   MinigameQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@map("minigame_answer_options")
+}
+
+model MinigameParticipant {
+  id         Int @id @default(autoincrement())
+  minigameId Int
+  userId     Int
+  score      Int @default(0)
+  attempts   Int @default(0)
+  completed  Boolean @default(false)
+
+  startedAt  DateTime @default(now())
+  completedAt DateTime?
+
+  minigame   Minigame @relation(fields: [minigameId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([minigameId, userId])
+  @@map("minigame_participants")
+}
+
+// ===== MUSIC SYSTEM =====
+model MusicPlaylist {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String?
+  isActive    Boolean  @default(true)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  songs       MusicSong[]
+  requests    MusicRequest[]
+
+  @@map("music_playlists")
+}
+
+model MusicSong {
+  id         Int    @id @default(autoincrement())
+  title      String
+  artist     String
+  duration   Int    // seconds
+  fileUrl    String
+  playlistId Int
+  order      Int    @default(0)
+
+  createdAt  DateTime @default(now())
+
+  playlist   MusicPlaylist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+  requests   MusicRequest[]
+
+  @@map("music_songs")
+}
+
+model MusicRequest {
+  id         Int           @id @default(autoincrement())
+  userId     Int
+  songId     Int?
+  playlistId Int?
+  requestType MusicRequestType
+  message    String?
+  status     RequestStatus @default(PENDING)
+
+  scheduledAt DateTime?
+  playedAt   DateTime?
+  createdAt  DateTime @default(now())
+
+  user       User          @relation(fields: [userId], references: [id])
+  song       MusicSong?    @relation(fields: [songId], references: [id])
+  playlist   MusicPlaylist? @relation(fields: [playlistId], references: [id])
+
+  @@map("music_requests")
+}
+
+enum MusicRequestType {
+  SONG_REQUEST
+  PLAYLIST_REQUEST
+  CUSTOM_UPLOAD
+}
+
+enum RequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  PLAYED
+}
+
+// ===== NOTIFICATION SYSTEM =====
+model Notification {
+  id         Int              @id @default(autoincrement())
+  title      String
+  message    String           @db.Text
+  type       NotificationType
+  targetId   Int?
+  targetType String?
+
+  isRead     Boolean @default(false)
+  userId     Int?    // null = broadcast to all
+
+  createdAt  DateTime @default(now())
+  readAt     DateTime?
+
+  @@map("notifications")
+}
+
+enum NotificationType {
+  EVENT_REMINDER
+  VOTE_REMINDER
+  MINIGAME_START
+  MUSIC_PLAYING
+  GENERAL_ANNOUNCEMENT
 }

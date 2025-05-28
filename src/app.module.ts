@@ -8,6 +8,12 @@ import { UsersModule } from './modules/users/users.module';
 import { EmailModule } from './modules/email/email.module';
 import { QueueModule } from './modules/queue/queue.module';
 import { GlobalAuthGuard } from './modules/auth/guards/global-auth.guard';
+import { ScheduleModule } from './modules/schedule/schedule.module';
+import { EventModule } from './modules/event/event.module';
+import { VoteModule } from './modules/vote/vote.module';
+import { MinigameModule } from './modules/minigame/minigame.module';
+import { MusicModule } from './modules/music/music.module';
+import { NotificationModule } from './modules/notification/notification.module';
 
 @Module({
   imports: [
@@ -27,6 +33,12 @@ import { GlobalAuthGuard } from './modules/auth/guards/global-auth.guard';
     UsersModule,
     EmailModule,
     QueueModule,
+    ScheduleModule,
+    EventModule,
+    VoteModule,
+    MinigameModule,
+    MusicModule,
+    NotificationModule,
   ],
   providers: [
     {
