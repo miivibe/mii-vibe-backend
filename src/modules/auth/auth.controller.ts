@@ -13,6 +13,7 @@ import { Request } from 'express';
 import { AuthService, LoginRequest } from './auth.service';
 import { SendOtpDto, LoginDto, VerifyOtpDto } from './dto/auth.dto';
 import { Public } from '../../common/decorators/public.decorator';
+import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
 @Controller('auth')
 export class AuthController {
@@ -84,6 +85,19 @@ export class AuthController {
   ) {
     const clientInfo = this.extractClientInfo(req);
     return this.authService.resetPassword(email, otp, newPassword, clientInfo);
+  }
+
+  @Get('verify')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async verifyAuth(@Req() req: Request) {
+    const userId = (req as any).user?.sub;
+    const user = await this.authService.getUserProfile(userId);
+
+    return {
+      message: 'Token is valid',
+      data: user,
+    };
   }
 
   private extractClientInfo(req: Request) {
